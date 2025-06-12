@@ -29,7 +29,9 @@ def playVideos():
         return
     random.shuffle(videos)
     for video in videos:
-        playProcess = Popen(['cvlc', '--play-and-exit', '--fullscreen', video])
+        # Uncomment for full screen
+        #playProcess = Popen(['cvlc', '--play-and-exit', '--fullscreen', video])
+        playProcess = Popen(['cvlc', '--win', '00,00,750,480', video])
         playProcess.wait()
 
 # runs endlessly, playing videos in a loop
