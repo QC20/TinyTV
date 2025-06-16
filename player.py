@@ -31,7 +31,7 @@ def playVideos():
     for video in videos:
         # Uncomment for full screen
         #playProcess = Popen(['cvlc', '--play-and-exit', '--fullscreen', video])
-        playProcess = Popen(['cvlc', '--win', '00,00,750,480', video])
+        playProcess = Popen(['cvlc', '--fullscreen', '--no-osd', '--loop', '--play-and-exit', video])
         playProcess.wait()
 
 # runs endlessly, playing videos in a loop
