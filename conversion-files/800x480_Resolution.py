@@ -62,21 +62,21 @@ def build_filter():
 def process_video(input_path):
     base = os.path.splitext(os.path.basename(input_path))[0]
     out_path = os.path.join(OUTPUT_DIR, f"{base}.mp4")
+    
     if os.path.exists(out_path):
         print(f"Skipping '{base}', output exists.")
         return False
 
     vf = build_filter()
-cmd = [
-    'ffmpeg', '-i', input_path,
-    '-vf', vf,
-    '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.0',
-    '-preset', 'veryslow', '-crf', '26',
-    '-c:a', 'aac', '-b:a', '96k',
-    '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
-    out_path
-]
-
+    cmd = [
+        'ffmpeg', '-i', input_path,
+        '-vf', vf,
+        '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.0',
+        '-preset', 'veryslow', '-crf', '28',
+        '-c:a', 'aac', '-b:a', '128k',
+        '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+        out_path
+    ]
 
     print(f"Encoding '{base}' with filters: {vf}")
     start = time.time()
