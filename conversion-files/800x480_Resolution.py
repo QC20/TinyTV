@@ -1,6 +1,7 @@
 import os
 import subprocess
 import time
+import json
 
 # Configuration
 DESKTOP = os.path.expanduser('~/Desktop')
@@ -32,7 +33,7 @@ crop_x = crop_h // 2
 crop_y = crop_v // 2
 
 def is_video_file(path):
-    return path.lower().endswith(('.mp4', '.mkv', '.mov', '.avi', '.flv', '.wmv', '.webm'))
+    return path.lower().endswith(('.mp4', '.mkv', '.mov', '.avi', '.flv', '.wmv', '.webm', 'mpeg'))
 
 def find_videos(directory):
     videos = []
@@ -71,13 +72,12 @@ def process_video(input_path):
     cmd = [
         'ffmpeg', '-i', input_path,
         '-vf', vf,
-        '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.0',
+        '-c:v', 'libx264', '-profile:v', 'main', '-level', '3.0',
         '-preset', 'veryslow', '-crf', '28',
         '-c:a', 'aac', '-b:a', '128k',
         '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
         out_path
     ]
-
     print(f"Encoding '{base}' with filters: {vf}")
     start = time.time()
     try:
