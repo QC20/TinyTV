@@ -6,7 +6,7 @@ import multiprocessing
 
 # Configuration
 DESKTOP = os.path.expanduser('~/Desktop')
-INPUT_DIR = os.path.join(DESKTOP, 'input1')
+INPUT_DIR = os.path.join(DESKTOP, 'input')
 OUTPUT_DIR = os.path.join(DESKTOP, 'output')
 ROTATE = True                        # Rotate 90 degrees or not
 ROTATE_DIR = 'counterclockwise'     # 'clockwise' or 'counterclockwise'
