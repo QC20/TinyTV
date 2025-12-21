@@ -1,0 +1,47 @@
+# Explanation of the specifications for the video counter system 
+
+Session-based playback cycle
+
+A "session" = playing each video file exactly once
+When all videos have been played once, start a new session
+Sessions repeat indefinitely
+
+
+Random selection with constraints
+
+Pick randomly, but ONLY from videos not yet played in the current session
+This prevents unlucky videos from being skipped repeatedly by chance
+Ensures even distribution of playtime
+
+
+Persistent state across restarts
+
+If the player stops, it resumes from where it left off
+Already-played videos in the current session stay marked as played
+Unplayed videos remain in the pool for random selection
+
+
+Historical tracking
+
+Track total play count for each video across ALL sessions
+Don't just reset counts when a new session starts
+Keep the history (e.g., "this video has been played 47 times total")
+
+
+Dynamic video management
+
+New videos added to directories get automatically detected
+They're immediately added to the current session as "unplayed"
+No manual registration needed
+
+
+Human-readable tracking file
+
+Non-programmers can open the file and understand what's happening
+Easy to see: what's been played, what hasn't, how many times total
+No complex formats - think text file or simple CSV
+
+
+
+In summary: Fair rotation system that remembers state, keeps history, and is transparent to non-technical users.
+
