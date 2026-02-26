@@ -8,6 +8,13 @@ desktop_path = os.path.expanduser("~/Desktop")
 input_directory = os.path.join(desktop_path, 'input')
 destination_directory = os.path.join(desktop_path, 'output')
 
+# Rotation settings
+ROTATE_90_DEGREES = True  # Set to False if no rotation is needed
+ROTATION_DIRECTION = 'counterclockwise'  # Options: 'clockwise' or 'counterclockwise'
+
+# Target width for output (adjust to 800 if needed)
+TARGET_WIDTH = 750  # or 800 for 800x480 screen
+
 # Create output directory if it doesn't exist
 if not os.path.exists(destination_directory):
     os.makedirs(destination_directory)
@@ -31,7 +38,6 @@ def format_time(seconds):
     return f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
 
 def check_existing_output(input_path, output_dir):
-    """Check if output file already exists and return its path if it does"""
     filename = os.path.basename(input_path)
     name_without_ext = os.path.splitext(filename)[0]
     output_path = os.path.join(output_dir, f"{name_without_ext}.mp4")
@@ -45,7 +51,8 @@ skipped_files = 0
 
 print(f"Found {total_files} video files to process in '{input_directory}'")
 print(f"Output will be saved to: {destination_directory}")
-print("Display format: 800×480 landscape (for 4\" HDMI LCD)")
+print(f"Rotation enabled: {'Yes' if ROTATE_90_DEGREES else 'No'} ({ROTATION_DIRECTION})")
+print(f"Target resolution: {TARGET_WIDTH}x480, H.264 baseline (Pi-optimized)")
 print("Processing files in alphabetical order...\n")
 
 for input_file in video_files:
@@ -68,13 +75,33 @@ for input_file in video_files:
     print(f"  Input: {input_file}")
     print(f"  Output: {output_file}")
     
-    # FFmpeg command for 800×480 landscape
+    # Build the filter chain
+    filter_chain = []
+    
+    if ROTATE_90_DEGREES:
+        transpose_value = 1 if ROTATION_DIRECTION == 'clockwise' else 2
+        filter_chain = [
+            "scale=800:-2",  # Scale width to 800, preserve aspect ratio
+            f"transpose={transpose_value}",  # Rotate 90 degrees
+            "crop=iw:480:0:(ih-480)/2",  # Crop to height 480, centered
+            f"pad={TARGET_WIDTH}:480:(ow-iw)/2:0"  # Pad to target width
+        ]
+    else:
+        filter_chain = [
+            "scale=-2:480",  # Scale to height 480 if no rotation
+            f"pad={TARGET_WIDTH}:480:(ow-iw)/2:0"  # Pad to target width
+        ]
+    
+    # Join all filters with commas
+    vf_string = ",".join(filter_chain)
+    
+    # Encode command
     encode_command = (
         f'ffmpeg -i "{input_file}" '
-        f'-vf "scale=800:-1" '  # Force 800px width, maintain aspect ratio
+        f'-vf "{vf_string}" '
         f'-c:v libx264 -profile:v baseline -level 3.0 '
-        f'-preset fast -crf 24 '  # Slightly higher CRF for smaller files
-        f'-pix_fmt yuv420p -movflags +faststart '  # Faststart for web playback
+        f'-preset fast -crf 23 '
+        f'-pix_fmt yuv420p -movflags +faststart '
         f'"{output_file}"'
     )
     
@@ -82,7 +109,7 @@ for input_file in video_files:
     try:
         encode_start = time.time()
         print("  Starting encoding...")
-        encode = os.popen(encode_command).read()
+        os.system(encode_command)
         encode_time = time.time() - encode_start
         
         processed_files += 1

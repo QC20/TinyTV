@@ -8,6 +8,10 @@ desktop_path = os.path.expanduser("~/Desktop")
 input_directory = os.path.join(desktop_path, 'input')
 destination_directory = os.path.join(desktop_path, 'output')
 
+# Rotation settings (updated to counter-clockwise)
+ROTATE_90_DEGREES = True  # Set to False if you don't want rotation
+ROTATION_DIRECTION = 'counterclockwise'  # Default changed to counter-clockwise
+
 # Create output directory if it doesn't exist
 if not os.path.exists(destination_directory):
     os.makedirs(destination_directory)
@@ -45,6 +49,7 @@ skipped_files = 0
 
 print(f"Found {total_files} video files to process in '{input_directory}'")
 print(f"Output will be saved to: {destination_directory}")
+print(f"Rotation enabled: {'Yes' if ROTATE_90_DEGREES else 'No'} ({ROTATION_DIRECTION})")
 print("Encoding specs: 480p height, H.264 baseline (Pi-optimized)")
 print("Processing files in alphabetical order...\n")
 
@@ -68,12 +73,27 @@ for input_file in video_files:
     print(f"  Input: {input_file}")
     print(f"  Output: {output_file}")
     
-    # Original 480p encoding command (Pi Zero optimized)
+    # Build the filter chain
+    filter_chain = []
+    
+    if ROTATE_90_DEGREES:
+        if ROTATION_DIRECTION == 'clockwise':
+            filter_chain.append("transpose=1")  # Clockwise 90 degrees
+        else:
+            filter_chain.append("transpose=2")  # Counter-clockwise 90 degrees
+    
+    # Add scaling to 480p
+    filter_chain.append("scale=-2:480")
+    
+    # Join all filters with commas
+    vf_string = ",".join(filter_chain)
+    
+    # Modified encode command with rotation
     encode_command = (
         f'ffmpeg -i "{input_file}" '
-        f'-vf "scale=-2:480" '  # Original 480p height, maintain aspect
+        f'-vf "{vf_string}" '
         f'-c:v libx264 -profile:v baseline -level 3.0 '
-        f'-preset fast -crf 23 '  # Original quality setting
+        f'-preset fast -crf 23 '
         f'-pix_fmt yuv420p -movflags +faststart '
         f'"{output_file}"'
     )
@@ -82,7 +102,7 @@ for input_file in video_files:
     try:
         encode_start = time.time()
         print("  Starting encoding...")
-        encode = os.popen(encode_command).read()
+        os.system(encode_command)  # Changed to os.system for better execution
         encode_time = time.time() - encode_start
         
         processed_files += 1

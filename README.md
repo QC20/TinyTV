@@ -132,8 +132,9 @@ If your particular Waveshare model includes a resistive touchscreen controller (
 
 1. Eject the microSD card safely from your computer.
 2. Insert it into your Raspberry Pi.
-3. Connect the OLED/HDMI cable from Pi → Waveshare LCD.
+3. Connect the HDMI cable from Pi → Waveshare LCD Screen.
 4. Connect your micro USB power (≥2 A).
+5. Alternatively, you can control power source through a [power HAT](https://www.waveshare.com/catalog/product/view/id/3844/s/li-polymer-battery-hat/category/37/) (like I have done in this build).
 
 The LCD’s backlight should turn on automatically. You should see boot text on the screen (e.g., kernel messages).
 
