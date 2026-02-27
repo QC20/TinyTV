@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 # This script encodes all video files in the current directory to mp4 format
 # using ffmpeg, scaling them to a height of 800 pixels while maintaining aspect ratio.
+
+# This code is no longer in use in the current configuration.
+
 import os
 
 # Ensure ffmpeg is installed and available in the system PATH
