@@ -84,14 +84,40 @@ def play_video(filepath):
     codec = get_video_codec(filepath)
     print(f"  Codec: {codec}")
 
-    base_args = ['mpv', '--vo=drm', '--drm-connector=HDMI-A-1', '--no-osd-bar', '--really-quiet']
+    # Core arguments for DRM (HDMI output without a desktop)
+    base_args = [
+        'mpv', 
+        '--vo=drm', 
+        '--drm-connector=HDMI-A-1', 
+        '--no-osd-bar', 
+        '--really-quiet',
+        '--cursor-autohide=always' # Keeps the mouse cursor hidden
+    ]
 
-    if codec in ('hevc', 'h265', 'vp9', 'av1'):
-        extra = ['--hwdec=no', '--vd-lavc-threads=4', '--cache=yes', '--demuxer-max-bytes=20M', '--video-sync=audio']
-    elif codec in ('h264', 'avc'):
-        extra = ['--hwdec=auto', '--cache=yes', '--demuxer-max-bytes=20M', '--video-sync=audio']
+    if codec in ('h264', 'avc'):
+        # PRO TIP: Explicitly use the Pi's hardware decoder
+        # 'v4l2m2m-copy' is the standard for modern Pi OS (Bullseye/Bookworm)
+        # If this fails, try 'mmal'
+        extra = [
+            '--hwdec=v4l2m2m-copy', 
+            '--cache=yes', 
+            '--demuxer-max-bytes=30M', 
+            '--video-sync=display-resample', # Smoother motion than audio-sync
+            '--hr-seek=yes'
+        ]
+    elif codec in ('hevc', 'h265', 'vp9', 'av1'):
+        # Pi 3B HAS no hardware for these. We must use CPU.
+        # We lower the quality slightly to help the poor CPU keep up.
+        extra = [
+            '--hwdec=no', 
+            '--vd-lavc-threads=4', 
+            '--cache=yes', 
+            '--demuxer-max-bytes=15M', 
+            '--vd-lavc-fast',          # Skips some processing to gain speed
+            '--vd-lavc-skiploopfilter=all' # Drastically reduces CPU load for H265
+        ]
     else:
-        extra = ['--hwdec=auto', '--cache=yes', '--demuxer-max-bytes=20M', '--video-sync=audio']
+        extra = ['--hwdec=auto', '--cache=yes', '--video-sync=audio']
 
     process = Popen(base_args + extra + [filepath])
     process.wait()
