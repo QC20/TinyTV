@@ -1,7 +1,7 @@
 """
 Commercial Video Processor for 4-inch Screen (800x480)
 Converts videos to optimal format with black bar removal, subtitle burning, and smart scaling
-Author: [Your Name/GitHub Handle]
+Author: QC20
 Date: November 2025
 
 Setup:

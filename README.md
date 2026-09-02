@@ -1,182 +1,122 @@
 # TinyTV
 
+A small 3D-printed television with a Raspberry Pi inside. It plays a library of
+episodes and old commercials on a loop — no menu, no remote, no interface. You
+flip the switch on the side and something is on, the way a TV in the corner of a
+room used to work.
 
-# Raspberry Pi + Waveshare 4" (800×480) HDMI LCD Setup
+![The printed enclosure](hardware/3d-print/images/Pic0_sml3.jpg)
 
-This guide walks you through the **exact steps** needed to get a Waveshare 4-inch HDMI LCD (800×480) working on a Raspberry Pi (headless), including Wi-Fi/SSH setup, display configuration, and touchscreen overlay. By following these instructions—along with the links below—you’ll be able to reproduce this configuration on your own Pi.
+*Enclosure model and photo by [highping on Thingiverse](https://www.thingiverse.com/thing:5019648), used under CC BY.*
 
----
+The Pi boots straight into a video player. There is no desktop and nothing to log
+into. Episodes are shuffled, and after each one a commercial plays before the
+next episode starts — which is most of what makes it feel like television rather
+than a video player in a box.
 
-## 📋 Prerequisites
+## How it works
 
-- **Raspberry Pi** (any model with HDMI output)
-- **microSD card** (≥8 GB)
-- **Waveshare 4″ HDMI LCD (800×480)**
-- **micro USB power supply** (≥2 A recommended)
-- **A computer** (Windows/macOS/Linux) with:
-  - SD-card reader
-  - Text editor (e.g., Sublime, VS Code, Notepad++)
+Everything is pre-processed on a desktop machine, so the Pi only ever has to do
+the easy job of playing files. Videos are encoded down to roughly 780×480 and
+rotated to match the panel, black bars cropped, subtitles burned in if there are
+any. That happens once, in [code/encoding](code/encoding).
 
----
+On the Pi, [player.py](code/player/player.py) shuffles the contents of
+`videos/tv` and `videos/commercials`, then alternates between them forever. It
+plays through `mpv` on the DRM video output, which draws directly to HDMI with no
+X server running. Before each file it probes the codec with `ffprobe` and picks
+its decoder flags accordingly: H.264 goes to the Pi's hardware decoder, anything
+else (H.265, VP9, AV1) falls back to software with the loop filter switched off,
+because a Pi 3B has no hardware path for those and will otherwise drop most of
+the frames.
 
-## 🔧 1. Download & Flash Raspberry Pi OS
+Play counts are written to `playback_state.txt` next to the script — a plain text
+file you can open and read, on purpose.
 
-1. Download the latest Raspberry Pi OS image from the official Raspberry Pi website:
-   - https://www.raspberrypi.com/software/ (choose “Raspberry Pi OS Lite” for a headless setup)
+[buttons.py](code/player/buttons.py) watches a toggle switch on GPIO 26. When
+it's off, GPIO 18 goes low to kill the backlight and GPIO 19 is dropped back to
+an input, which cuts the PWM audio feeding the amp. Screen and sound go together,
+so the switch on the side of the case behaves like a real power switch.
 
-2. Flash the image to your microSD card using **Raspberry Pi Imager** or **BalenaEtcher**:
-   - Raspberry Pi Imager: https://www.raspberrypi.com/software/
-   - BalenaEtcher: https://www.balena.io/etcher/
+## Hardware
 
-3. Once flashing completes, eject and re-insert the microSD card. It should mount on your computer as a drive named `boot`.
+| Part | Notes |
+| --- | --- |
+| Raspberry Pi 3B | The player is tuned for its decoder; a newer Pi has more headroom |
+| Waveshare 4″ HDMI LCD | 800×480 IPS, resistive touch (unused here), HDMI + USB |
+| Waveshare UPS HAT (D) | 2× 5300 mAh cells, INA219 current sensor on I²C `0x43` |
+| Adafruit MAX98357 | Class-D mono amp driving a small speaker |
+| Toggle switch, 1 kΩ pot, relay | Power and volume on the front panel |
 
----
+Wiring diagram (again from the original build):
+[hardware/3d-print/images/Wiring.jpg](hardware/3d-print/images/Wiring.jpg).
+Datasheets for the HAT and the amp are in [hardware/datasheets](hardware/datasheets).
 
-## 🛰️ 2. Headless Wi-Fi & SSH Setup
+## Layout
 
-> These two steps let your Pi connect to Wi-Fi on first boot and enable SSH access.
-
-1. **Create `wpa_supplicant.conf`**
-   In your preferred text editor, paste:
-   ```conf
-   country=US
-   ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-   update_config=1
-
-   network={
-       ssid="YOUR_WIFI_SSID"
-       psk="YOUR_WIFI_PASSWORD"
-   }
-   ```
-   Replace `YOUR_WIFI_SSID` and `YOUR_WIFI_PASSWORD` exactly (case-sensitive).
-
-   Change `country=US` to your two-letter ISO country code if you’re not in the U.S. (e.g., GB, DE, DK).
-
-   Save the file as `wpa_supplicant.conf` to the root of the `boot` partition (the same folder as `config.txt`).
-
-2. **Create an empty `ssh` file** (no extension) in the root of the `boot` partition.
-
-   On Windows: Right-click → New → Text Document → Rename to `ssh` (remove `.txt`).
-
-   On macOS/Linux:
-   ```bash
-   touch /Volumes/boot/ssh
-   ```
-   This blank file tells Raspberry Pi OS to enable the SSH server on first boot.
-
----
-
-## 🖥️ 3. Display Configuration (config.txt)
-
-The Waveshare 4″ HDMI LCD requires a custom HDMI mode + optional touchscreen overlay. Edit the existing `config.txt` on the `boot` partition as follows:
-
-1. Open `/boot/config.txt` in your text editor.
-
-2. Scroll down to the bottom and add (or replace) these lines under the `[all]` section (create `[all]` if it isn’t already there):
-
-   ```ini
-   [all]
-   # Use a custom HDMI mode for 800×480 @ 60 Hz
-   hdmi_group=2
-   hdmi_mode=87
-   hdmi_cvt=800 480 60 6 0 0 0
-   hdmi_drive=2
-
-   # Rotate the display 90° clockwise (adjust if you want a different orientation)
-   display_rotate=1
-
-   # Enable GPIO 18 to control the backlight (Waveshare’s wiring)
-   gpio=18=op,dh
-   ```
-   - `hdmi_group=2` + `hdmi_mode=87` + `hdmi_cvt` → forces Pi to output 800×480
-   - `display_rotate=1` → rotates the screen upright (change to `2`/`3`/`0` as needed)
-   - `gpio=18=op,dh` → configures GPIO 18 as an output and drives it HIGH at boot (powers the backlight)
-
-3. Save and close `config.txt`.
-
----
-
-## 💾 4. Touchscreen Overlay (.dtbo)
-
-If your particular Waveshare model includes a resistive touchscreen controller (ADS7846), add the Device Tree overlay so the touchscreen works.
-
-1. **Download the `.dtbo` file:**
-   Official wiki for Waveshare 4″ HDMI LCD:
-   https://www.waveshare.com/wiki/4inch_HDMI_LCD
-
-   Under “Resources → Raspbian Driver,” locate and download `waveshare-ads7846.dtbo`.
-
-2. **Copy `waveshare-ads7846.dtbo` into the Pi’s overlays folder:**
-   Insert the SD card if it’s not already mounted.
-
-   Copy `waveshare-ads7846.dtbo` to:
-   ```bash
-   /boot/overlays/
-   ```
-
-3. **Enable the overlay:**
-   Edit `config.txt` again (the same file in `/boot/`), and add this line below your HDMI settings:
-
-   ```ini
-   dtoverlay=waveshare-ads7846,penirq=25,xmin=150,xmax=3900,ymin=100,ymax=3950,speed=50000
-   ```
-   This configures the ADS7846 touchscreen on GPIO 25 (`PENIRQ`) and calibrates X/Y ranges.
-
-   Adjust `xmin`/`xmax`/`ymin`/`ymax` if you need further calibration.
-
-4. Save/close `config.txt`.
-
----
-
-## 🔌 5. Final Steps & Boot
-
-1. Eject the microSD card safely from your computer.
-2. Insert it into your Raspberry Pi.
-3. Connect the HDMI cable from Pi → Waveshare LCD Screen.
-4. Connect your micro USB power (≥2 A).
-5. Alternatively, you can control power source through a [power HAT](https://www.waveshare.com/catalog/product/view/id/3844/s/li-polymer-battery-hat/category/37/) (like I have done in this build).
-
-The LCD’s backlight should turn on automatically. You should see boot text on the screen (e.g., kernel messages).
-
-**SSH into your Pi** (if Wi-Fi is configured):
-
-```bash
-ssh pi@<YOUR_PI_IP_ADDRESS>
-# Default password: raspberry
+```text
+boot/          Files that go on the SD card's boot partition before first boot
+code/
+  player/      What runs on the Pi: playback loop and the power switch handler
+  encoding/    Desktop-side ffmpeg tooling that prepares videos for the screen
+  monitoring/  Battery, temperature and system telemetry over the INA219
+  video-analysis/  Library statistics — how many hours of content is on there
+  experiments/ Parked attempts, kept for reference
+docs/          Display setup guide and the playback design notes
+hardware/      STLs, Fusion 360 source, renders and component datasheets
+samples/       An example encoded clip
 ```
-If you’re unsure of the Pi’s IP, attach an HDMI monitor or check your router’s DHCP list.
 
----
+## Getting one running
 
-## 🧪 6. Verify & Troubleshoot
+1. Flash Raspberry Pi OS Lite and set the Pi up headless. The display needs a
+   custom HDMI mode and a device tree overlay before it will show anything —
+   [docs/pi-display-setup.md](docs/pi-display-setup.md) has the exact
+   `config.txt` lines and the touchscreen overlay.
+2. Copy the contents of [boot/](boot/) to the boot partition. Fill in your own
+   SSID and password in `wpa_supplicant.conf` first.
+3. Install the runtime dependencies on the Pi:
+   ```bash
+   sudo apt install mpv ffmpeg python3-rpi.gpio
+   pip3 install pi-ina219 psutil
+   ```
+4. Encode your videos with [code/encoding/480x800-screen.py](code/encoding/480x800-screen.py)
+   and copy them to `code/player/videos/tv` and `code/player/videos/commercials`.
+5. Run `python3 player.py`. Once it looks right, put it behind a systemd unit so
+   it comes up on boot.
 
-**No image on LCD:**
-- Double-check that `hdmi_cvt=800 480 60 6 0 0 0` is correct and under `[all]`.
-- Make sure `hdmi_drive=2` is present (enables HDMI sound/backlight).
-- Verify `gpio=18=op,dh` if backlight stays off.
-- Try a different HDMI cable or port.
+## Known gaps
 
-**Touchscreen not responding:**
-- Ensure `waveshare-ads7846.dtbo` is in `/boot/overlays/`.
-- Confirm `dtoverlay=waveshare-ads7846,...` is at the bottom of `config.txt`.
-- Check GPIO 25 (“PENIRQ”) wiring.
-- For further calibration, see Waveshare’s ADS7846 documentation:
-  https://www.waveshare.com/wiki/4inch_HDMI_LCD
+This is a finished object rather than a finished piece of software, and a few
+things never got past "good enough":
 
-**Headless/Wi-Fi issues:**
-- Make sure `wpa_supplicant.conf` is in `/boot/`.
-- Confirm SSID/PSK are correct (case-sensitive).
-- Reboot Pi, then check router’s DHCP table for the Pi’s IP.
+- **Playback state only saves on a clean exit.** `player.py` writes
+  `playback_state.txt` when you Ctrl+C it. Pull the power — which is how the
+  thing is normally switched off — and the session's play counts are lost.
+- **The rotation is a shuffle, not the design in the notes.**
+  [docs/playback-design.md](docs/playback-design.md) describes a session system
+  that picks randomly from what hasn't played yet, survives restarts, and picks
+  up new files automatically. `code/experiments/player_WITH-CIRCULATION.py`
+  implements it, but it plays through `--hwdec=auto` and stutters badly on a
+  3B, so the simpler shuffle is what actually ships.
+- **The VCR buttons aren't wired to anything.** The case models two micro
+  switches into the VCR on top. Skip and rewind would be the obvious use.
+- **No service file.** Starting on boot is left to you.
 
----
+## Credits
 
-## 🔗 Reference Links
+The enclosure is [The Simpsons TV (Remixed for HDMI display)](https://www.thingiverse.com/thing:5019648)
+by **highping**, itself a remodel of [buba447's original](https://www.thingiverse.com/thing:4943159).
+buba447's [build guide](https://withrow.io/simpsons-tv-build-guide) still covers
+most of the hardware side; the display setup is the part that differs.
 
-- **Waveshare 4″ HDMI LCD Wiki** (official driver & .dtbo downloads):
-  https://www.waveshare.com/wiki/4inch_HDMI_LCD
+## License
 
-- **Raspberry Pi OS Download & Imager**:
-  https://www.raspberrypi.com/software/
+The code in this repository is MIT licensed — see [LICENSE](LICENSE).
 
-- **Headless SSH & Wi-Fi Setup Guide** (Raspberry Pi Foundation):
-  https://www.raspberrypi.com/documentation/computers/configuration.html#configuring-networking-ssh-and-headless-operation
+The 3D models in [hardware/3d-print](hardware/3d-print) are not mine and are not
+covered by that. They are Creative Commons Attribution, by highping — see
+[hardware/3d-print/LICENSE.txt](hardware/3d-print/LICENSE.txt).
+
+Bring your own video. Nothing here ships with content, and the point is to play
+things you already own.

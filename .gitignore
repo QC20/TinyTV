@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Generated at runtime on the Pi
+playback_state.txt
+last_video.txt
+
+# Video working directories (source and encoded output)
+code/player/videos/
+code/encoding/input/
+code/encoding/output/
